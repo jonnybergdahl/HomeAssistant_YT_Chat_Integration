@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Pick Authentication Method"
+      },
+      "select_channel": {
+        "title": "Select YouTube Channel",
+        "description": "Your account has multiple YouTube channels. Select the one to monitor.",
+        "data": {
+          "channel_id": "Channel"
+        }
+      },
+      "select_monitor_mode": {
+        "title": "Monitor Mode",
+        "description": "Choose whether to monitor your own channel's live chat or another channel's.",
+        "data": {
+          "monitor_mode": "Monitor"
+        }
+      },
+      "enter_channel_id": {
+        "title": "Enter Channel ID",
+        "description": "Enter the YouTube channel ID to monitor. You can find it in the channel's URL (e.g., UCxxxxxxxx).",
+        "data": {
+          "target_channel_id": "Channel ID"
+        }
+      }
+    },
+    "error": {
+      "channel_not_found": "Channel not found. Please check the channel ID and try again."
+    },
+    "abort": {
+      "already_configured": "This YouTube channel is already configured.",
+      "no_channel": "No YouTube channel found for this account.",
+      "authorize_url_timeout": "Timeout generating authorize URL.",
+      "missing_configuration": "The integration is not configured. Please follow the documentation.",
+      "already_in_progress": "Configuration flow is already in progress.",
+      "oauth_error": "Received invalid token data.",
+      "oauth_timeout": "Timeout resolving OAuth token.",
+      "oauth_unauthorized": "OAuth authorization error.",
+      "oauth_failed": "Failed to obtain access token.",
+      "unknown": "Unexpected error.",
+      "reauth_successful": "Re-authentication was successful."
+    },
+    "create_entry": {
+      "default": "Successfully authenticated with YouTube."
+    }
+  }
+}

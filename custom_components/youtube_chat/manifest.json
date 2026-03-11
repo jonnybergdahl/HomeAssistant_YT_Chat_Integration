@@ -1,0 +1,11 @@
+{
+  "domain": "youtube_chat",
+  "name": "YouTube Chat",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["application_credentials"],
+  "documentation": "https://github.com/jonnybergdahl/HomeAssistant_YT_Chat_Integration",
+  "iot_class": "cloud_polling",
+  "requirements": ["google-auth-oauthlib==1.2.0", "google-api-python-client==2.120.0"],
+  "version": "0.1.0"
+}
