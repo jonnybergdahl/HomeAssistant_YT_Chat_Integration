@@ -31,7 +31,7 @@ class YouTubeChatIsLiveSensor(CoordinatorEntity[YouTubeChatCoordinator], BinaryS
     """Binary sensor that indicates if the YouTube channel is currently live."""
 
     _attr_has_entity_name = True
-    _attr_name = "yt_chat_is_live"
+    _attr_translation_key = "is_live"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     def __init__(

@@ -49,8 +49,35 @@ class YouTubeChatOAuth2FlowHandler(
             "prompt": "consent",
         }
 
+    async def async_step_user(
+        self, user_input: dict | None = None
+    ) -> ConfigFlowResult:
+        """Handle user-initiated flow, reusing token if an entry already exists."""
+        # Check for existing entries we can reuse the token from
+        existing_entries = self.hass.config_entries.async_entries(DOMAIN)
+        if existing_entries:
+            existing_entry = existing_entries[0]
+            # Reuse the existing entry's token data
+            token_data = existing_entry.data.get("token")
+            if token_data:
+                _LOGGER.info("Reusing existing OAuth token for new entry")
+                data = dict(existing_entry.data)
+                # Remove entry-specific fields so we start fresh
+                data.pop(CONF_CHANNEL_ID, None)
+                data.pop(CONF_MONITOR_MODE, None)
+                data.pop(CONF_TARGET_CHANNEL_ID, None)
+                return await self._setup_youtube_and_proceed(data)
+
+        # No existing entry — go through OAuth
+        return await super().async_step_user(user_input)
+
     async def async_oauth_create_entry(self, data: dict) -> ConfigFlowResult:
         """Create an entry for the flow after OAuth completes."""
+        _LOGGER.info("Successfully authenticated")
+        return await self._setup_youtube_and_proceed(data)
+
+    async def _setup_youtube_and_proceed(self, data: dict) -> ConfigFlowResult:
+        """Build YouTube client, fetch channels, and proceed to configuration."""
         from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
 
@@ -75,7 +102,9 @@ class YouTubeChatOAuth2FlowHandler(
             return self.async_abort(reason="api_error")
 
         items = response.get("items", [])
-        _LOGGER.debug("channels.list(mine=True) returned %d items: %s", len(items), items)
+        _LOGGER.debug(
+            "channels.list(mine=True) returned %d items: %s", len(items), items
+        )
 
         self._data = data
 
@@ -84,9 +113,7 @@ class YouTubeChatOAuth2FlowHandler(
             return await self.async_step_enter_channel_id()
 
         # Build channel_id -> title mapping
-        self._channels = {
-            ch["id"]: ch["snippet"]["title"] for ch in items
-        }
+        self._channels = {ch["id"]: ch["snippet"]["title"] for ch in items}
 
         if len(self._channels) == 1:
             channel_id = next(iter(self._channels))
@@ -105,9 +132,7 @@ class YouTubeChatOAuth2FlowHandler(
             self._data[CONF_CHANNEL_ID] = user_input[CONF_CHANNEL_ID]
             return await self.async_step_select_monitor_mode()
 
-        channel_options = {
-            cid: title for cid, title in self._channels.items()
-        }
+        channel_options = {cid: title for cid, title in self._channels.items()}
 
         return self.async_show_form(
             step_id="select_channel",

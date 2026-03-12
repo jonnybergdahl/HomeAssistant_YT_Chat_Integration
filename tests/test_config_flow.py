@@ -383,3 +383,68 @@ class TestConfigFlowEdgeCases:
         assert "id" in call_kwargs
         assert call_kwargs["id"] == MOCK_TARGET_CHANNEL_ID
         assert "forHandle" not in call_kwargs
+
+
+class TestConfigFlowTokenReuse:
+    """Tests for reusing existing OAuth tokens."""
+
+    async def test_reuses_token_from_existing_entry(self, hass: HomeAssistant):
+        """When an entry already exists, skip OAuth and reuse its token."""
+        # Create a mock existing config entry
+        existing_entry = MagicMock()
+        existing_entry.data = {
+            "token": MOCK_TOKEN_DATA,
+            "auth_implementation": "test",
+            CONF_CHANNEL_ID: MOCK_CHANNEL_ID,
+            CONF_MONITOR_MODE: MONITOR_MODE_OWN,
+        }
+        hass.config_entries.async_entries = MagicMock(return_value=[existing_entry])
+
+        mock_yt = _build_mock_youtube(SINGLE_CHANNEL_RESPONSE)
+        p1, p2 = _patch_google(mock_yt)
+
+        with p1, p2:
+            flow = _create_flow(hass)
+            result = await flow.async_step_user()
+
+        # Should skip OAuth and go straight to monitor mode selection
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "select_monitor_mode"
+
+    async def test_no_existing_entry_starts_oauth(self, hass: HomeAssistant):
+        """When no entries exist, proceed with normal OAuth flow."""
+        hass.config_entries.async_entries = MagicMock(return_value=[])
+
+        flow = _create_flow(hass)
+        # async_step_user with no existing entries should call super()
+        # which triggers the OAuth flow — we just verify it doesn't
+        # go to monitor mode selection
+        result = await flow.async_step_user()
+
+        # Should show the OAuth picker, not monitor mode
+        assert result.get("step_id") != "select_monitor_mode"
+
+    async def test_reused_token_clears_entry_specific_fields(
+        self, hass: HomeAssistant
+    ):
+        """Reused token data should not carry over entry-specific fields."""
+        existing_entry = MagicMock()
+        existing_entry.data = {
+            "token": MOCK_TOKEN_DATA,
+            "auth_implementation": "test",
+            CONF_CHANNEL_ID: MOCK_CHANNEL_ID,
+            CONF_MONITOR_MODE: MONITOR_MODE_OWN,
+            CONF_TARGET_CHANNEL_ID: "UCold_target",
+        }
+        hass.config_entries.async_entries = MagicMock(return_value=[existing_entry])
+
+        mock_yt = _build_mock_youtube(SINGLE_CHANNEL_RESPONSE)
+        p1, p2 = _patch_google(mock_yt)
+
+        with p1, p2:
+            flow = _create_flow(hass)
+            await flow.async_step_user()
+
+        # The internal data should not contain old entry-specific fields
+        assert CONF_TARGET_CHANNEL_ID not in flow._data
+        assert CONF_MONITOR_MODE not in flow._data

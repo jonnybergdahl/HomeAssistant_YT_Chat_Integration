@@ -28,7 +28,7 @@ class YouTubeChatAllowedRolesSelect(RestoreEntity, SelectEntity):
     """Select entity for choosing the allowed roles filter."""
 
     _attr_has_entity_name = True
-    _attr_name = "yt_chat_allowed_roles"
+    _attr_translation_key = "allowed_roles"
     _attr_options = ALLOWED_ROLES
     _attr_current_option = ROLE_OWNER_ONLY
 

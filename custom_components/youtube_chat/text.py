@@ -28,7 +28,7 @@ class YouTubeChatKeywordsText(RestoreEntity, TextEntity):
     """Text entity for managing the keyword list."""
 
     _attr_has_entity_name = True
-    _attr_name = "yt_chat_keywords"
+    _attr_translation_key = "keywords"
     _attr_mode = TextMode.TEXT
     _attr_native_max = 1000
     _attr_native_value = ""

@@ -27,7 +27,7 @@
       }
     },
     "error": {
-      "channel_not_found": "Channel not found. Please check the channel ID and try again."
+      "channel_not_found": "Channel not found. Please check the channel handle or ID and try again."
     },
     "abort": {
       "already_configured": "This YouTube channel is already configured.",
@@ -45,6 +45,34 @@
     },
     "create_entry": {
       "default": "Successfully authenticated with YouTube."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "is_live": {
+        "name": "Is live"
+      }
+    },
+    "sensor": {
+      "viewer_count": {
+        "name": "Viewer count"
+      },
+      "last_super_chat": {
+        "name": "Last Super Chat"
+      },
+      "last_super_sticker": {
+        "name": "Last Super Sticker"
+      }
+    },
+    "text": {
+      "keywords": {
+        "name": "Keywords"
+      }
+    },
+    "select": {
+      "allowed_roles": {
+        "name": "Allowed roles"
+      }
     }
   }
 }

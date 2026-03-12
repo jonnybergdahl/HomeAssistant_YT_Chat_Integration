@@ -84,7 +84,7 @@ class ViewerCountSensor(CoordinatorEntity[YouTubeChatCoordinator], SensorEntity)
     """Sensor showing the current viewer count."""
 
     _attr_has_entity_name = True
-    _attr_name = "yt_chat_viewer_count"
+    _attr_translation_key = "viewer_count"
     _attr_native_unit_of_measurement = "viewers"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -127,7 +127,7 @@ class KeywordSensor(
         """Initialize the keyword sensor."""
         super().__init__(coordinator)
         self._keyword = keyword
-        self._attr_name = f"yt_chat_keyword_{keyword}"
+        self._attr_name = f"Keyword {keyword}"
         self._attr_unique_id = f"{entry.entry_id}_keyword_{keyword}"
         self._attr_device_info = get_device_info(entry)
         self._restored_value: str | None = None
@@ -173,7 +173,7 @@ class LastSuperChatSensor(
     """Sensor showing the last received Super Chat."""
 
     _attr_has_entity_name = True
-    _attr_name = "yt_chat_last_super_chat"
+    _attr_translation_key = "last_super_chat"
 
     def __init__(
         self, coordinator: YouTubeChatCoordinator, entry: ConfigEntry
@@ -229,7 +229,7 @@ class LastSuperStickerSensor(
     """Sensor showing the last received Super Sticker."""
 
     _attr_has_entity_name = True
-    _attr_name = "yt_chat_last_super_sticker"
+    _attr_translation_key = "last_super_sticker"
 
     def __init__(
         self, coordinator: YouTubeChatCoordinator, entry: ConfigEntry

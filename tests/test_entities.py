@@ -95,7 +95,7 @@ class TestIsLiveBinarySensor:
         entry = _make_mock_entry()
 
         sensor = YouTubeChatIsLiveSensor(coord, entry)
-        assert sensor.name == "yt_chat_is_live"
+        assert sensor.translation_key == "is_live"
 
 
 # ---------- Viewer count sensor ----------
@@ -268,7 +268,7 @@ class TestKeywordSensor:
         entry = _make_mock_entry()
 
         sensor = KeywordSensor(coord, entry, "color")
-        assert sensor.name == "yt_chat_keyword_color"
+        assert sensor.name == "Keyword color"
 
 
 # ---------- Text entity ----------
@@ -315,7 +315,7 @@ class TestKeywordsText:
         entry = _make_mock_entry()
 
         text = YouTubeChatKeywordsText(coord, entry)
-        assert text.name == "yt_chat_keywords"
+        assert text.translation_key == "keywords"
 
     def test_max_length(self, hass: HomeAssistant, mock_youtube_api: MagicMock):
         """Text entity has max length set."""
@@ -377,7 +377,7 @@ class TestAllowedRolesSelect:
         entry = _make_mock_entry()
 
         select = YouTubeChatAllowedRolesSelect(coord, entry)
-        assert select.name == "yt_chat_allowed_roles"
+        assert select.translation_key == "allowed_roles"
 
 
 # ---------- Last Super Chat sensor ----------
@@ -510,7 +510,7 @@ class TestLastSuperChatSensor:
         entry = _make_mock_entry()
 
         sensor = LastSuperChatSensor(coord, entry)
-        assert sensor.name == "yt_chat_last_super_chat"
+        assert sensor.translation_key == "last_super_chat"
 
 
 # ---------- Last Super Sticker sensor ----------
@@ -576,4 +576,4 @@ class TestLastSuperStickerSensor:
         entry = _make_mock_entry()
 
         sensor = LastSuperStickerSensor(coord, entry)
-        assert sensor.name == "yt_chat_last_super_sticker"
+        assert sensor.translation_key == "last_super_sticker"
