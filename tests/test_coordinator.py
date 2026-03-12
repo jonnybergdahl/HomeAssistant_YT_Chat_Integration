@@ -186,6 +186,134 @@ class TestSetKeywords:
         assert received == [set()]
 
 
+# ---------- API call parameter validation ----------
+
+# Valid `part` values per YouTube Data API v3 endpoint
+VALID_BROADCASTS_PARTS = {"id", "snippet", "contentDetails", "monetizationDetails", "status", "statistics"}
+VALID_VIDEOS_PARTS = {
+    "contentDetails", "fileDetails", "id", "liveStreamingDetails",
+    "localizations", "player", "processingDetails", "recordingDetails",
+    "snippet", "statistics", "status", "suggestions", "topicDetails",
+}
+VALID_SEARCH_PARTS = {"id", "snippet"}
+VALID_CHAT_MESSAGES_PARTS = {"id", "snippet", "authorDetails"}
+
+
+class TestApiCallParameters:
+    """Verify API calls use only valid parameters for each endpoint."""
+
+    async def test_broadcasts_list_uses_valid_parts(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """liveBroadcasts.list must only use valid part values."""
+        coord = YouTubeChatCoordinator(
+            hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
+        )
+        mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = (
+            make_broadcast_response()
+        )
+        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+            make_video_details_response()
+        )
+
+        await coord._check_for_broadcast()
+
+        call_kwargs = mock_youtube_api.liveBroadcasts.return_value.list.call_args
+        requested_parts = set(call_kwargs.kwargs["part"].split(","))
+        invalid = requested_parts - VALID_BROADCASTS_PARTS
+        assert not invalid, f"liveBroadcasts.list uses invalid parts: {invalid}"
+
+    async def test_videos_list_uses_valid_parts(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """videos.list must only use valid part values."""
+        coord = YouTubeChatCoordinator(
+            hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
+        )
+        mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = (
+            make_broadcast_response()
+        )
+        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+            make_video_details_response()
+        )
+
+        await coord._check_for_broadcast()
+
+        call_kwargs = mock_youtube_api.videos.return_value.list.call_args
+        requested_parts = set(call_kwargs.kwargs["part"].split(","))
+        invalid = requested_parts - VALID_VIDEOS_PARTS
+        assert not invalid, f"videos.list uses invalid parts: {invalid}"
+
+    async def test_search_list_uses_valid_parts(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """search.list must only use valid part values."""
+        coord = YouTubeChatCoordinator(
+            hass,
+            mock_youtube_api,
+            MOCK_ENTRY_ID,
+            MONITOR_MODE_OTHER,
+            MOCK_TARGET_CHANNEL_ID,
+        )
+        mock_youtube_api.search.return_value.list.return_value.execute.return_value = (
+            make_search_response()
+        )
+        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+            make_video_details_response()
+        )
+
+        await coord._check_for_broadcast()
+
+        call_kwargs = mock_youtube_api.search.return_value.list.call_args
+        requested_parts = set(call_kwargs.kwargs["part"].split(","))
+        invalid = requested_parts - VALID_SEARCH_PARTS
+        assert not invalid, f"search.list uses invalid parts: {invalid}"
+
+    async def test_chat_messages_list_uses_valid_parts(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """liveChatMessages.list must only use valid part values."""
+        coord = YouTubeChatCoordinator(
+            hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
+        )
+        coord._is_live = True
+        coord._live_chat_id = MOCK_LIVE_CHAT_ID
+
+        mock_youtube_api.liveChatMessages.return_value.list.return_value.execute.return_value = (
+            make_chat_response()
+        )
+
+        await coord._poll_chat()
+
+        call_kwargs = mock_youtube_api.liveChatMessages.return_value.list.call_args
+        requested_parts = set(call_kwargs.kwargs["part"].split(","))
+        invalid = requested_parts - VALID_CHAT_MESSAGES_PARTS
+        assert not invalid, f"liveChatMessages.list uses invalid parts: {invalid}"
+
+    async def test_broadcasts_list_does_not_combine_mine_and_broadcaststatus(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """liveBroadcasts.list must not use mine and broadcastStatus together."""
+        coord = YouTubeChatCoordinator(
+            hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
+        )
+        mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = (
+            make_broadcast_response()
+        )
+        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+            make_video_details_response()
+        )
+
+        await coord._check_for_broadcast()
+
+        call_kwargs = mock_youtube_api.liveBroadcasts.return_value.list.call_args.kwargs
+        has_mine = call_kwargs.get("mine", False)
+        has_broadcast_status = "broadcastStatus" in call_kwargs
+        assert not (
+            has_mine and has_broadcast_status
+        ), "liveBroadcasts.list must not combine mine and broadcastStatus parameters"
+
+
 # ---------- Broadcast discovery (own) ----------
 
 
@@ -233,12 +361,39 @@ class TestBroadcastDiscoveryOwn:
     async def test_broadcast_without_chat_id(
         self, hass: HomeAssistant, mock_youtube_api: MagicMock
     ):
-        """Broadcast without liveChatId resets state."""
+        """Live broadcast without liveChatId resets state."""
         coord = YouTubeChatCoordinator(
             hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
         )
         mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = {
-            "items": [{"id": MOCK_VIDEO_ID, "snippet": {}}]
+            "items": [
+                {
+                    "id": MOCK_VIDEO_ID,
+                    "snippet": {},
+                    "status": {"lifeCycleStatus": "live"},
+                }
+            ]
+        }
+
+        await coord._check_for_broadcast()
+
+        assert coord._is_live is False
+
+    async def test_non_live_broadcasts_are_ignored(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """Broadcasts with non-live status are ignored."""
+        coord = YouTubeChatCoordinator(
+            hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
+        )
+        mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = {
+            "items": [
+                {
+                    "id": MOCK_VIDEO_ID,
+                    "snippet": {"liveChatId": MOCK_LIVE_CHAT_ID},
+                    "status": {"lifeCycleStatus": "complete"},
+                }
+            ]
         }
 
         await coord._check_for_broadcast()

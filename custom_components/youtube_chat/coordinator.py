@@ -137,12 +137,19 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
             self._api_check_broadcast_own
         )
 
+        # Filter for active/live broadcasts (mine=True returns all statuses)
         items = response.get("items", [])
-        if not items:
+        broadcast = None
+        for item in items:
+            status = item.get("status", {}).get("lifeCycleStatus")
+            if status in ("live", "liveStarting"):
+                broadcast = item
+                break
+
+        if broadcast is None:
             self._reset_live_state()
             return
 
-        broadcast = items[0]
         snippet = broadcast.get("snippet", {})
         self._live_chat_id = snippet.get("liveChatId")
 
@@ -217,12 +224,11 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
         )
 
     def _api_check_broadcast_own(self) -> dict:
-        """Call the YouTube API to check for own active broadcasts (sync)."""
+        """Call the YouTube API to check for own broadcasts (sync)."""
         return (
             self.youtube.liveBroadcasts()
             .list(
                 part="snippet,status",
-                broadcastStatus="active",
                 mine=True,
             )
             .execute()
