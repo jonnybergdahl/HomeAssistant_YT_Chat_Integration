@@ -200,7 +200,10 @@ class TestBroadcastDiscoveryOwn:
             hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
         )
         mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = (
-            make_broadcast_response(viewer_count=100)
+            make_broadcast_response()
+        )
+        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+            make_video_details_response(viewer_count=100)
         )
 
         await coord._check_for_broadcast()
@@ -235,7 +238,7 @@ class TestBroadcastDiscoveryOwn:
             hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
         )
         mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.return_value = {
-            "items": [{"snippet": {}, "liveStreamingDetails": {}}]
+            "items": [{"id": MOCK_VIDEO_ID, "snippet": {}}]
         }
 
         await coord._check_for_broadcast()

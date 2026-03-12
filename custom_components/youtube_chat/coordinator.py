@@ -153,10 +153,18 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
         self._is_live = True
         self._next_page_token = None
 
-        details = broadcast.get("liveStreamingDetails", {})
-        viewer_count = details.get("concurrentViewers")
-        if viewer_count is not None:
-            self._viewer_count = int(viewer_count)
+        # Get viewer count from videos.list (liveBroadcasts doesn't have it)
+        video_id = broadcast.get("id")
+        if video_id:
+            video_response = await self.hass.async_add_executor_job(
+                self._api_get_video_details, video_id
+            )
+            video_items = video_response.get("items", [])
+            if video_items:
+                details = video_items[0].get("liveStreamingDetails", {})
+                viewer_count = details.get("concurrentViewers")
+                if viewer_count is not None:
+                    self._viewer_count = int(viewer_count)
 
         self.update_interval = timedelta(seconds=DEFAULT_POLL_INTERVAL)
         _LOGGER.info("Active broadcast found, live chat ID: %s", self._live_chat_id)
@@ -213,7 +221,7 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
         return (
             self.youtube.liveBroadcasts()
             .list(
-                part="snippet,status,liveStreamingDetails",
+                part="snippet,status",
                 broadcastStatus="active",
                 mine=True,
             )

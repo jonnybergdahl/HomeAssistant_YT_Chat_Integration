@@ -123,17 +123,15 @@ def _build_mock_youtube() -> MagicMock:
 
 def make_broadcast_response(
     live_chat_id: str = MOCK_LIVE_CHAT_ID,
-    viewer_count: int = 42,
+    video_id: str = MOCK_VIDEO_ID,
 ) -> dict:
     """Build a mock liveBroadcasts.list response."""
     return {
         "items": [
             {
+                "id": video_id,
                 "snippet": {"liveChatId": live_chat_id},
                 "status": {"lifeCycleStatus": "live"},
-                "liveStreamingDetails": {
-                    "concurrentViewers": str(viewer_count),
-                },
             }
         ]
     }
