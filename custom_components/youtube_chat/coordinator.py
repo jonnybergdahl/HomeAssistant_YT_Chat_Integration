@@ -17,6 +17,8 @@ from .const import (
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     EVENT_KEYWORD_DETECTED,
+    EVENT_SUPER_CHAT,
+    EVENT_SUPER_STICKER,
     MONITOR_MODE_OTHER,
     ROLE_EVERYONE,
     ROLE_MODERATORS_AND_OWNER,
@@ -26,6 +28,10 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 COMMAND_RE = re.compile(r"^!(\w+)\s+(.+)$")
+
+MSG_TYPE_TEXT = "textMessageEvent"
+MSG_TYPE_SUPER_CHAT = "superChatEvent"
+MSG_TYPE_SUPER_STICKER = "superStickerEvent"
 
 
 def is_author_allowed(author_details: dict, role: str) -> bool:
@@ -69,6 +75,9 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
         self._viewer_count: int | None = None
         # Per-keyword last received data
         self._keyword_data: dict[str, dict] = {}
+        # Last Super Chat / Super Sticker data
+        self._last_super_chat: dict | None = None
+        self._last_super_sticker: dict | None = None
 
         # State pushed by text/select entities — no entity ID guessing
         self.keywords: str = ""
@@ -263,7 +272,94 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
         return self.youtube.liveChatMessages().list(**request_kwargs).execute()
 
     def _process_message(self, message: dict) -> None:
-        """Process a single chat message for command matching."""
+        """Process a single chat message."""
+        snippet = message.get("snippet", {})
+        msg_type = snippet.get("type", MSG_TYPE_TEXT)
+
+        if msg_type == MSG_TYPE_SUPER_CHAT:
+            self._process_super_chat(message)
+        elif msg_type == MSG_TYPE_SUPER_STICKER:
+            self._process_super_sticker(message)
+        elif msg_type == MSG_TYPE_TEXT:
+            self._process_text_message(message)
+
+    def _process_super_chat(self, message: dict) -> None:
+        """Process a Super Chat message."""
+        snippet = message.get("snippet", {})
+        author_details = message.get("authorDetails", {})
+        details = snippet.get("superChatDetails", {})
+
+        now = datetime.now(timezone.utc)
+        author_name = author_details.get("displayName", "Unknown")
+
+        self._last_super_chat = {
+            "amount_display_string": details.get("amountDisplayString", ""),
+            "amount_micros": details.get("amountMicros", 0),
+            "currency": details.get("currency", ""),
+            "tier": details.get("tier", 0),
+            "comment": details.get("userComment", ""),
+            "author": author_name,
+            "author_channel_id": author_details.get("channelId", ""),
+            "received_at": now,
+            "is_chat_owner": author_details.get("isChatOwner", False),
+            "is_chat_sponsor": author_details.get("isChatSponsor", False),
+            "is_chat_moderator": author_details.get("isChatModerator", False),
+        }
+
+        event_data = {
+            "amount": details.get("amountDisplayString", ""),
+            "amount_micros": details.get("amountMicros", 0),
+            "currency": details.get("currency", ""),
+            "tier": details.get("tier", 0),
+            "comment": details.get("userComment", ""),
+            "author": author_name,
+            "author_channel_id": author_details.get("channelId", ""),
+            "received_at": now.isoformat(),
+        }
+        self.hass.bus.async_fire(EVENT_SUPER_CHAT, event_data)
+        _LOGGER.debug("Super Chat received: %s from %s", details.get("amountDisplayString"), author_name)
+
+    def _process_super_sticker(self, message: dict) -> None:
+        """Process a Super Sticker message."""
+        snippet = message.get("snippet", {})
+        author_details = message.get("authorDetails", {})
+        details = snippet.get("superStickerDetails", {})
+        sticker_meta = details.get("superStickerMetadata", {})
+
+        now = datetime.now(timezone.utc)
+        author_name = author_details.get("displayName", "Unknown")
+
+        self._last_super_sticker = {
+            "amount_display_string": details.get("amountDisplayString", ""),
+            "amount_micros": details.get("amountMicros", 0),
+            "currency": details.get("currency", ""),
+            "tier": details.get("tier", 0),
+            "sticker_id": sticker_meta.get("stickerId", ""),
+            "sticker_alt_text": sticker_meta.get("altText", ""),
+            "author": author_name,
+            "author_channel_id": author_details.get("channelId", ""),
+            "received_at": now,
+            "is_chat_owner": author_details.get("isChatOwner", False),
+            "is_chat_sponsor": author_details.get("isChatSponsor", False),
+            "is_chat_moderator": author_details.get("isChatModerator", False),
+        }
+
+        event_data = {
+            "amount": details.get("amountDisplayString", ""),
+            "amount_micros": details.get("amountMicros", 0),
+            "currency": details.get("currency", ""),
+            "tier": details.get("tier", 0),
+            "sticker_id": sticker_meta.get("stickerId", ""),
+            "sticker_alt_text": sticker_meta.get("altText", ""),
+            "author": author_name,
+            "author_channel_id": author_details.get("channelId", ""),
+            "received_at": now.isoformat(),
+        }
+        self.hass.bus.async_fire(EVENT_SUPER_STICKER, event_data)
+        _LOGGER.debug("Super Sticker received: %s from %s", details.get("amountDisplayString"), author_name)
+
+    def _process_text_message(self, message: dict) -> None:
+        """Process a regular text chat message for command matching."""
         snippet = message.get("snippet", {})
         author_details = message.get("authorDetails", {})
         display_message = snippet.get("displayMessage", "")
@@ -328,4 +424,6 @@ class YouTubeChatCoordinator(DataUpdateCoordinator):
             "is_live": self._is_live,
             "viewer_count": self._viewer_count,
             "keywords": dict(self._keyword_data),
+            "last_super_chat": self._last_super_chat,
+            "last_super_sticker": self._last_super_sticker,
         }

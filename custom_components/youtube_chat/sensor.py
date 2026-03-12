@@ -28,8 +28,12 @@ async def async_setup_entry(
         "coordinator"
     ]
 
-    # Always add the viewer count sensor
-    async_add_entities([ViewerCountSensor(coordinator, entry)])
+    # Always add the static sensors
+    async_add_entities([
+        ViewerCountSensor(coordinator, entry),
+        LastSuperChatSensor(coordinator, entry),
+        LastSuperStickerSensor(coordinator, entry),
+    ])
 
     # Track keyword sensors so we can add/remove dynamically
     keyword_sensors: dict[str, KeywordSensor] = {}
@@ -159,5 +163,118 @@ class KeywordSensor(
                     "is_chat_owner": kw_data["is_chat_owner"],
                     "is_chat_sponsor": kw_data["is_chat_sponsor"],
                     "is_chat_moderator": kw_data["is_chat_moderator"],
+                }
+        return self._restored_attrs
+
+
+class LastSuperChatSensor(
+    CoordinatorEntity[YouTubeChatCoordinator], RestoreEntity, SensorEntity
+):
+    """Sensor showing the last received Super Chat."""
+
+    _attr_has_entity_name = True
+    _attr_name = "yt_chat_last_super_chat"
+
+    def __init__(
+        self, coordinator: YouTubeChatCoordinator, entry: ConfigEntry
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_last_super_chat"
+        self._attr_device_info = get_device_info(entry)
+        self._restored_value: str | None = None
+        self._restored_attrs: dict | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore last state on startup."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            self._restored_value = last_state.state
+            self._restored_attrs = dict(last_state.attributes)
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the last Super Chat amount display string."""
+        if self.coordinator.data is not None:
+            sc_data = self.coordinator.data.get("last_super_chat")
+            if sc_data is not None:
+                return sc_data["amount_display_string"]
+        return self._restored_value
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Return extra attributes about the last Super Chat."""
+        if self.coordinator.data is not None:
+            sc_data = self.coordinator.data.get("last_super_chat")
+            if sc_data is not None:
+                return {
+                    "amount_micros": sc_data["amount_micros"],
+                    "currency": sc_data["currency"],
+                    "tier": sc_data["tier"],
+                    "comment": sc_data["comment"],
+                    "author": sc_data["author"],
+                    "author_channel_id": sc_data["author_channel_id"],
+                    "received_at": sc_data["received_at"].isoformat(),
+                    "is_chat_owner": sc_data["is_chat_owner"],
+                    "is_chat_sponsor": sc_data["is_chat_sponsor"],
+                    "is_chat_moderator": sc_data["is_chat_moderator"],
+                }
+        return self._restored_attrs
+
+
+class LastSuperStickerSensor(
+    CoordinatorEntity[YouTubeChatCoordinator], RestoreEntity, SensorEntity
+):
+    """Sensor showing the last received Super Sticker."""
+
+    _attr_has_entity_name = True
+    _attr_name = "yt_chat_last_super_sticker"
+
+    def __init__(
+        self, coordinator: YouTubeChatCoordinator, entry: ConfigEntry
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_last_super_sticker"
+        self._attr_device_info = get_device_info(entry)
+        self._restored_value: str | None = None
+        self._restored_attrs: dict | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore last state on startup."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            self._restored_value = last_state.state
+            self._restored_attrs = dict(last_state.attributes)
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the last Super Sticker amount display string."""
+        if self.coordinator.data is not None:
+            ss_data = self.coordinator.data.get("last_super_sticker")
+            if ss_data is not None:
+                return ss_data["amount_display_string"]
+        return self._restored_value
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Return extra attributes about the last Super Sticker."""
+        if self.coordinator.data is not None:
+            ss_data = self.coordinator.data.get("last_super_sticker")
+            if ss_data is not None:
+                return {
+                    "amount_micros": ss_data["amount_micros"],
+                    "currency": ss_data["currency"],
+                    "tier": ss_data["tier"],
+                    "sticker_id": ss_data["sticker_id"],
+                    "sticker_alt_text": ss_data["sticker_alt_text"],
+                    "author": ss_data["author"],
+                    "author_channel_id": ss_data["author_channel_id"],
+                    "received_at": ss_data["received_at"].isoformat(),
+                    "is_chat_owner": ss_data["is_chat_owner"],
+                    "is_chat_sponsor": ss_data["is_chat_sponsor"],
+                    "is_chat_moderator": ss_data["is_chat_moderator"],
                 }
         return self._restored_attrs

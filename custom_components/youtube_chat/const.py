@@ -2,6 +2,8 @@
 
 DOMAIN = "youtube_chat"
 EVENT_KEYWORD_DETECTED = "youtube_chat_keyword_detected"
+EVENT_SUPER_CHAT = "youtube_chat_super_chat"
+EVENT_SUPER_STICKER = "youtube_chat_super_sticker"
 CONF_CHANNEL_ID = "channel_id"
 CONF_MONITOR_MODE = "monitor_mode"
 CONF_TARGET_CHANNEL_ID = "target_channel_id"

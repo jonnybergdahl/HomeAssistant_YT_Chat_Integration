@@ -8,6 +8,7 @@ A custom Home Assistant integration that monitors YouTube Live Chat for commands
 - Detects `!command parameter` messages (e.g., `!lights off`, `!color red`)
 - Fires Home Assistant events for each matched command
 - Creates a sensor per keyword showing the last received parameter
+- Super Chat and Super Sticker support with dedicated sensors and events
 - Configurable role filtering (Everyone, Moderators and owner, Owner only)
 - Supports multiple YouTube channels per Google account
 - Dynamic polling interval based on YouTube API recommendations
@@ -16,6 +17,10 @@ A custom Home Assistant integration that monitors YouTube Live Chat for commands
 ## Installation
 
 ### HACS (Recommended)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jonnybergdahl&repository=HomeAssistant_YT_Chat_Integration&category=Integration)
+
+Or install manually through HACS:
 
 1. Open HACS in Home Assistant
 2. Click the three dots menu in the top right and select **Custom repositories**
@@ -42,6 +47,10 @@ Before configuring the integration, you need to set up a Google Cloud project:
 
 ## Configuration
 
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=youtube_chat)
+
+Or set up manually:
+
 1. In Home Assistant, go to **Settings > Devices & Services**
 2. Click **Add Integration** and search for **YouTube Chat**
 3. Before starting the flow, go to **Settings > Application Credentials** and add your Google Client ID and Client Secret
@@ -59,6 +68,8 @@ For a channel named "MyChannel", the following entities are created:
 | `binary_sensor.mychannel_yt_chat_is_live` | Binary Sensor | Whether the channel is currently live |
 | `sensor.mychannel_yt_chat_viewer_count` | Sensor | Current viewer count (available only when live) |
 | `text.mychannel_yt_chat_keywords` | Text | Comma-separated list of keywords to monitor |
+| `sensor.mychannel_yt_chat_last_super_chat` | Sensor | Last Super Chat amount (e.g., "$5.00") |
+| `sensor.mychannel_yt_chat_last_super_sticker` | Sensor | Last Super Sticker amount |
 | `select.mychannel_yt_chat_allowed_roles` | Select | Who can trigger commands |
 
 ### Keyword Sensors
@@ -82,7 +93,18 @@ The integration watches for chat messages matching the pattern `!command paramet
 
 If the keywords list is empty, all valid `!command parameter` messages pass through. If keywords are set (e.g., `lights,color,scene`), only those commands are matched.
 
+### Super Chat & Super Sticker Sensors
+
+| Entity | State | Attributes |
+|---|---|---|
+| `sensor.mychannel_yt_chat_last_super_chat` | Amount (e.g., "$5.00") | `currency`, `amount_micros`, `tier`, `comment`, `author`, `received_at`, `is_chat_owner`, `is_chat_sponsor`, `is_chat_moderator` |
+| `sensor.mychannel_yt_chat_last_super_sticker` | Amount (e.g., "$2.00") | `currency`, `amount_micros`, `tier`, `sticker_id`, `sticker_alt_text`, `author`, `received_at`, `is_chat_owner`, `is_chat_sponsor`, `is_chat_moderator` |
+
+These sensors persist across restarts and update whenever a new Super Chat or Super Sticker is received.
+
 ## Events
+
+### Keyword events
 
 Each matched command fires a `youtube_chat_keyword_detected` event:
 
@@ -95,6 +117,37 @@ data:
   author_channel_id: "UCxxxxxxxx"
   message: "!lights off"
   matched_at: "2026-03-11T20:15:00+00:00"
+```
+
+### Super Chat events
+
+```yaml
+event_type: youtube_chat_super_chat
+data:
+  amount: "$5.00"
+  amount_micros: 5000000
+  currency: "USD"
+  tier: 2
+  comment: "Great stream!"
+  author: "GenerousViewer"
+  author_channel_id: "UCxxxxxxxx"
+  received_at: "2026-03-11T20:15:00+00:00"
+```
+
+### Super Sticker events
+
+```yaml
+event_type: youtube_chat_super_sticker
+data:
+  amount: "$2.00"
+  amount_micros: 2000000
+  currency: "USD"
+  tier: 1
+  sticker_id: "sticker_abc123"
+  sticker_alt_text: "Hype train"
+  author: "StickerFan"
+  author_channel_id: "UCxxxxxxxx"
+  received_at: "2026-03-11T20:15:00+00:00"
 ```
 
 ## Automation Examples
@@ -128,6 +181,22 @@ automation:
         data:
           name: "YouTube Chat"
           message: "{{ trigger.event.data.author }} used !{{ trigger.event.data.keyword }} {{ trigger.event.data.parameter }}"
+```
+
+### React to Super Chats
+
+```yaml
+automation:
+  - alias: "YouTube Chat - Super Chat Alert"
+    trigger:
+      - platform: event
+        event_type: youtube_chat_super_chat
+    action:
+      - service: tts.speak
+        target:
+          entity_id: tts.google_en_com
+        data:
+          message: "{{ trigger.event.data.author }} sent {{ trigger.event.data.amount }}!"
 ```
 
 ### Use sensor state
