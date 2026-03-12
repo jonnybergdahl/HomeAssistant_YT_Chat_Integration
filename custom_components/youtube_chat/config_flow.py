@@ -72,17 +72,21 @@ class YouTubeChatOAuth2FlowHandler(
             )
         except Exception:
             _LOGGER.exception("Failed to fetch YouTube channels")
-            return self.async_abort(reason="no_channel")
+            return self.async_abort(reason="api_error")
 
         items = response.get("items", [])
+        _LOGGER.debug("channels.list(mine=True) returned %d items: %s", len(items), items)
+
+        self._data = data
+
         if not items:
-            return self.async_abort(reason="no_channel")
+            # No own channels found — skip straight to "Other channel" mode
+            return await self.async_step_enter_channel_id()
 
         # Build channel_id -> title mapping
         self._channels = {
             ch["id"]: ch["snippet"]["title"] for ch in items
         }
-        self._data = data
 
         if len(self._channels) == 1:
             channel_id = next(iter(self._channels))

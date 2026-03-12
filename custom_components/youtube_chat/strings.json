@@ -32,6 +32,7 @@
     "abort": {
       "already_configured": "This YouTube channel is already configured.",
       "no_channel": "No YouTube channel found for this account.",
+      "api_error": "Failed to communicate with the YouTube API. Please check that the YouTube Data API v3 is enabled in your Google Cloud project.",
       "authorize_url_timeout": "Timeout generating authorize URL.",
       "missing_configuration": "The integration is not configured. Please follow the documentation.",
       "already_in_progress": "Configuration flow is already in progress.",

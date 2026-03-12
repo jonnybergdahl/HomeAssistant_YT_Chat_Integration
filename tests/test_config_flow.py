@@ -251,8 +251,8 @@ class TestConfigFlowOtherChannel:
 class TestConfigFlowEdgeCases:
     """Tests for edge cases in the config flow."""
 
-    async def test_no_channels_aborts(self, hass: HomeAssistant):
-        """No channels on account aborts the flow."""
+    async def test_no_channels_proceeds_to_enter_channel_id(self, hass: HomeAssistant):
+        """No own channels skips to enter_channel_id for other-channel mode."""
         mock_yt = _build_mock_youtube({"items": []})
         p1, p2 = _patch_google(mock_yt)
 
@@ -260,8 +260,31 @@ class TestConfigFlowEdgeCases:
             flow = _create_flow(hass)
             result = await flow.async_oauth_create_entry({"token": MOCK_TOKEN_DATA})
 
-        assert result["type"] == FlowResultType.ABORT
-        assert result["reason"] == "no_channel"
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "enter_channel_id"
+
+    async def test_no_channels_can_create_other_entry(self, hass: HomeAssistant):
+        """No own channels → enter channel ID → creates entry successfully."""
+        mock_yt = _build_mock_youtube({"items": []})
+        p1, p2 = _patch_google(mock_yt)
+
+        with p1, p2:
+            flow = _create_flow(hass)
+            await flow.async_oauth_create_entry({"token": MOCK_TOKEN_DATA})
+
+            # Now return target channel for the lookup
+            mock_yt.channels.return_value.list.return_value.execute.return_value = (
+                TARGET_CHANNEL_RESPONSE
+            )
+
+            result = await flow.async_step_enter_channel_id(
+                {CONF_TARGET_CHANNEL_ID: MOCK_TARGET_CHANNEL_ID}
+            )
+
+        assert result["type"] == FlowResultType.CREATE_ENTRY
+        assert result["title"] == MOCK_TARGET_CHANNEL_TITLE
+        assert result["data"][CONF_MONITOR_MODE] == MONITOR_MODE_OTHER
+        assert result["data"][CONF_TARGET_CHANNEL_ID] == MOCK_TARGET_CHANNEL_ID
 
     async def test_api_error_during_channel_fetch_aborts(self, hass: HomeAssistant):
         """API error fetching own channels aborts."""
@@ -276,7 +299,7 @@ class TestConfigFlowEdgeCases:
             result = await flow.async_oauth_create_entry({"token": MOCK_TOKEN_DATA})
 
         assert result["type"] == FlowResultType.ABORT
-        assert result["reason"] == "no_channel"
+        assert result["reason"] == "api_error"
 
     async def test_channel_id_is_trimmed(self, hass: HomeAssistant):
         """Whitespace around channel ID is stripped."""
