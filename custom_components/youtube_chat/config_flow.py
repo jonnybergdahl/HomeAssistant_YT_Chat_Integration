@@ -152,32 +152,40 @@ class YouTubeChatOAuth2FlowHandler(
     async def async_step_enter_channel_id(
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
-        """Let the user enter a target channel ID to monitor."""
+        """Let the user enter a target channel handle or ID to monitor."""
         errors = {}
 
         if user_input is not None:
-            target_channel_id = user_input[CONF_TARGET_CHANNEL_ID].strip()
+            channel_input = user_input[CONF_TARGET_CHANNEL_ID].strip()
+
+            # Detect @handle vs UC... channel ID
+            if channel_input.startswith("@"):
+                lookup_params = {"part": "snippet", "forHandle": channel_input}
+            else:
+                lookup_params = {"part": "snippet", "id": channel_input}
 
             # Validate the channel exists
             try:
                 response = await self.hass.async_add_executor_job(
                     lambda: self._youtube.channels()
-                    .list(part="snippet", id=target_channel_id)
+                    .list(**lookup_params)
                     .execute()
                 )
             except Exception:
-                _LOGGER.exception("Failed to look up channel %s", target_channel_id)
+                _LOGGER.exception("Failed to look up channel %s", channel_input)
                 errors["base"] = "channel_not_found"
             else:
                 items = response.get("items", [])
                 if not items:
                     errors["base"] = "channel_not_found"
                 else:
+                    # Always store the resolved UC... channel ID
+                    resolved_channel_id = items[0]["id"]
                     channel_title = items[0]["snippet"]["title"]
                     self._data[CONF_MONITOR_MODE] = MONITOR_MODE_OTHER
-                    self._data[CONF_TARGET_CHANNEL_ID] = target_channel_id
+                    self._data[CONF_TARGET_CHANNEL_ID] = resolved_channel_id
                     return await self._create_entry(
-                        target_channel_id, channel_title
+                        resolved_channel_id, channel_title
                     )
 
         return self.async_show_form(

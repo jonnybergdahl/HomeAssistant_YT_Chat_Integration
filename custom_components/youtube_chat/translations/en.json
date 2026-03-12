@@ -19,10 +19,10 @@
         }
       },
       "enter_channel_id": {
-        "title": "Enter Channel ID",
-        "description": "Enter the YouTube channel ID to monitor. You can find it in the channel's URL (e.g., UCxxxxxxxx).",
+        "title": "Enter Channel",
+        "description": "Enter the YouTube channel handle (e.g., @channelname) or channel ID (e.g., UCxxxxxxxx) to monitor.",
         "data": {
-          "target_channel_id": "Channel ID"
+          "target_channel_id": "Channel handle or ID"
         }
       }
     },

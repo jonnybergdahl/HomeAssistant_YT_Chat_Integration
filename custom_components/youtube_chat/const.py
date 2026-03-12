@@ -23,8 +23,15 @@ ALLOWED_ROLES = [ROLE_EVERYONE, ROLE_MODERATORS_AND_OWNER, ROLE_OWNER_ONLY]
 
 def get_device_info(entry) -> dict:
     """Return device info for grouping entities under the channel device."""
+    # Use target channel ID for "other" mode, own channel ID for "own" mode
+    monitor_mode = entry.data.get(CONF_MONITOR_MODE, MONITOR_MODE_OWN)
+    if monitor_mode == MONITOR_MODE_OTHER:
+        channel_id = entry.data.get(CONF_TARGET_CHANNEL_ID, entry.entry_id)
+    else:
+        channel_id = entry.data.get(CONF_CHANNEL_ID, entry.entry_id)
+
     return {
-        "identifiers": {(DOMAIN, entry.data.get(CONF_CHANNEL_ID, entry.entry_id))},
+        "identifiers": {(DOMAIN, channel_id)},
         "name": entry.title,
         "manufacturer": "YouTube",
     }

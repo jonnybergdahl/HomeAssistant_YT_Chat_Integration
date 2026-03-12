@@ -324,3 +324,62 @@ class TestConfigFlowEdgeCases:
 
         assert result["type"] == FlowResultType.CREATE_ENTRY
         assert result["data"][CONF_TARGET_CHANNEL_ID] == MOCK_TARGET_CHANNEL_ID
+
+    async def test_handle_lookup_uses_for_handle(self, hass: HomeAssistant):
+        """@handle input uses forHandle API parameter and resolves to channel ID."""
+        mock_yt = _build_mock_youtube(SINGLE_CHANNEL_RESPONSE)
+        p1, p2 = _patch_google(mock_yt)
+
+        with p1, p2:
+            flow = _create_flow(hass)
+
+            await flow.async_oauth_create_entry({"token": MOCK_TOKEN_DATA})
+            await flow.async_step_select_monitor_mode(
+                {CONF_MONITOR_MODE: MONITOR_MODE_OTHER}
+            )
+
+            mock_yt.channels.return_value.list.return_value.execute.return_value = (
+                TARGET_CHANNEL_RESPONSE
+            )
+
+            result = await flow.async_step_enter_channel_id(
+                {CONF_TARGET_CHANNEL_ID: "@targetchannel"}
+            )
+
+        assert result["type"] == FlowResultType.CREATE_ENTRY
+        # Should resolve to the UC... ID from the API response
+        assert result["data"][CONF_TARGET_CHANNEL_ID] == MOCK_TARGET_CHANNEL_ID
+        assert result["title"] == MOCK_TARGET_CHANNEL_TITLE
+
+        # Verify forHandle was used in the API call
+        call_kwargs = mock_yt.channels.return_value.list.call_args.kwargs
+        assert "forHandle" in call_kwargs
+        assert call_kwargs["forHandle"] == "@targetchannel"
+        assert "id" not in call_kwargs
+
+    async def test_channel_id_lookup_uses_id_param(self, hass: HomeAssistant):
+        """UC... channel ID input uses id API parameter."""
+        mock_yt = _build_mock_youtube(SINGLE_CHANNEL_RESPONSE)
+        p1, p2 = _patch_google(mock_yt)
+
+        with p1, p2:
+            flow = _create_flow(hass)
+
+            await flow.async_oauth_create_entry({"token": MOCK_TOKEN_DATA})
+            await flow.async_step_select_monitor_mode(
+                {CONF_MONITOR_MODE: MONITOR_MODE_OTHER}
+            )
+
+            mock_yt.channels.return_value.list.return_value.execute.return_value = (
+                TARGET_CHANNEL_RESPONSE
+            )
+
+            result = await flow.async_step_enter_channel_id(
+                {CONF_TARGET_CHANNEL_ID: MOCK_TARGET_CHANNEL_ID}
+            )
+
+        # Verify id was used in the API call
+        call_kwargs = mock_yt.channels.return_value.list.call_args.kwargs
+        assert "id" in call_kwargs
+        assert call_kwargs["id"] == MOCK_TARGET_CHANNEL_ID
+        assert "forHandle" not in call_kwargs
