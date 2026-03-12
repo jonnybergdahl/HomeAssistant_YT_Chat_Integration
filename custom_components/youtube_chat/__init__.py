@@ -39,7 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     credentials = Credentials(token=token)
 
     youtube = await hass.async_add_executor_job(
-        build, "youtube", "v3", credentials
+        lambda: build("youtube", "v3", credentials=credentials)
     )
 
     monitor_mode = entry.data.get(CONF_MONITOR_MODE, MONITOR_MODE_OWN)

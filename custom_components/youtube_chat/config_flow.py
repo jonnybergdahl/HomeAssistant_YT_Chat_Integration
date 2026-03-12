@@ -63,7 +63,7 @@ class YouTubeChatOAuth2FlowHandler(
 
         try:
             self._youtube = await self.hass.async_add_executor_job(
-                build, "youtube", "v3", credentials
+                lambda: build("youtube", "v3", credentials=credentials)
             )
             response = await self.hass.async_add_executor_job(
                 lambda: self._youtube.channels()
