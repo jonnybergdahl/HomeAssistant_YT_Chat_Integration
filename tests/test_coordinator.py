@@ -21,8 +21,10 @@ from custom_components.youtube_chat.const import (
     MONITOR_MODE_OTHER,
     MONITOR_MODE_OWN,
     ROLE_EVERYONE,
+    ROLE_MEMBERS_AND_ABOVE,
     ROLE_MODERATORS_AND_OWNER,
     ROLE_OWNER_ONLY,
+    SCHEDULE_CHECK_INTERVAL,
 )
 from custom_components.youtube_chat.coordinator import (
     COMMAND_RE,
@@ -36,9 +38,10 @@ from .conftest import (
     MOCK_TARGET_CHANNEL_ID,
     MOCK_VIDEO_ID,
     make_broadcast_response,
+    make_channel_response,
     make_chat_message,
     make_chat_response,
-    make_search_response,
+    make_playlist_items_response,
     make_super_chat_message,
     make_super_sticker_message,
     make_video_details_response,
@@ -77,6 +80,27 @@ class TestIsAuthorAllowed:
             )
             is False
         )
+
+    def test_members_and_above_allows_sponsor(self):
+        """Members and above role allows sponsors, mods, and owner."""
+        assert (
+            is_author_allowed({"isChatSponsor": True}, ROLE_MEMBERS_AND_ABOVE) is True
+        )
+        assert (
+            is_author_allowed({"isChatModerator": True}, ROLE_MEMBERS_AND_ABOVE)
+            is True
+        )
+        assert (
+            is_author_allowed({"isChatOwner": True}, ROLE_MEMBERS_AND_ABOVE) is True
+        )
+        assert (
+            is_author_allowed(
+                {"isChatSponsor": False, "isChatModerator": False, "isChatOwner": False},
+                ROLE_MEMBERS_AND_ABOVE,
+            )
+            is False
+        )
+        assert is_author_allowed({}, ROLE_MEMBERS_AND_ABOVE) is False
 
     def test_unknown_role_denies(self):
         """Unknown role string denies everyone."""
@@ -195,7 +219,11 @@ VALID_VIDEOS_PARTS = {
     "localizations", "player", "processingDetails", "recordingDetails",
     "snippet", "statistics", "status", "suggestions", "topicDetails",
 }
-VALID_SEARCH_PARTS = {"id", "snippet"}
+VALID_CHANNELS_PARTS = {
+    "auditDetails", "brandingSettings", "contentDetails", "contentOwnerDetails",
+    "id", "localizations", "snippet", "statistics", "status", "topicDetails",
+}
+VALID_PLAYLIST_ITEMS_PARTS = {"contentDetails", "id", "snippet", "status"}
 VALID_CHAT_MESSAGES_PARTS = {"id", "snippet", "authorDetails"}
 
 
@@ -244,10 +272,10 @@ class TestApiCallParameters:
         invalid = requested_parts - VALID_VIDEOS_PARTS
         assert not invalid, f"videos.list uses invalid parts: {invalid}"
 
-    async def test_search_list_uses_valid_parts(
+    async def test_channels_list_uses_valid_parts(
         self, hass: HomeAssistant, mock_youtube_api: MagicMock
     ):
-        """search.list must only use valid part values."""
+        """channels.list must only use valid part values."""
         coord = YouTubeChatCoordinator(
             hass,
             mock_youtube_api,
@@ -255,8 +283,11 @@ class TestApiCallParameters:
             MONITOR_MODE_OTHER,
             MOCK_TARGET_CHANNEL_ID,
         )
-        mock_youtube_api.search.return_value.list.return_value.execute.return_value = (
-            make_search_response()
+        mock_youtube_api.channels.return_value.list.return_value.execute.return_value = (
+            make_channel_response()
+        )
+        mock_youtube_api.playlistItems.return_value.list.return_value.execute.return_value = (
+            make_playlist_items_response()
         )
         mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
             make_video_details_response()
@@ -264,10 +295,38 @@ class TestApiCallParameters:
 
         await coord._check_for_broadcast()
 
-        call_kwargs = mock_youtube_api.search.return_value.list.call_args
+        call_kwargs = mock_youtube_api.channels.return_value.list.call_args
         requested_parts = set(call_kwargs.kwargs["part"].split(","))
-        invalid = requested_parts - VALID_SEARCH_PARTS
-        assert not invalid, f"search.list uses invalid parts: {invalid}"
+        invalid = requested_parts - VALID_CHANNELS_PARTS
+        assert not invalid, f"channels.list uses invalid parts: {invalid}"
+
+    async def test_playlist_items_list_uses_valid_parts(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """playlistItems.list must only use valid part values."""
+        coord = YouTubeChatCoordinator(
+            hass,
+            mock_youtube_api,
+            MOCK_ENTRY_ID,
+            MONITOR_MODE_OTHER,
+            MOCK_TARGET_CHANNEL_ID,
+        )
+        mock_youtube_api.channels.return_value.list.return_value.execute.return_value = (
+            make_channel_response()
+        )
+        mock_youtube_api.playlistItems.return_value.list.return_value.execute.return_value = (
+            make_playlist_items_response()
+        )
+        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+            make_video_details_response()
+        )
+
+        await coord._check_for_broadcast()
+
+        call_kwargs = mock_youtube_api.playlistItems.return_value.list.call_args
+        requested_parts = set(call_kwargs.kwargs["part"].split(","))
+        invalid = requested_parts - VALID_PLAYLIST_ITEMS_PARTS
+        assert not invalid, f"playlistItems.list uses invalid parts: {invalid}"
 
     async def test_chat_messages_list_uses_valid_parts(
         self, hass: HomeAssistant, mock_youtube_api: MagicMock
@@ -407,6 +466,19 @@ class TestBroadcastDiscoveryOwn:
 class TestBroadcastDiscoveryOther:
     """Tests for other-channel broadcast discovery."""
 
+    def _setup_other_mocks(self, mock_youtube_api, video_details=None):
+        """Set up the channels + playlistItems + videos mock chain."""
+        mock_youtube_api.channels.return_value.list.return_value.execute.return_value = (
+            make_channel_response()
+        )
+        mock_youtube_api.playlistItems.return_value.list.return_value.execute.return_value = (
+            make_playlist_items_response()
+        )
+        if video_details is not None:
+            mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
+                video_details
+            )
+
     async def test_finds_other_channel_broadcast(
         self, hass: HomeAssistant, mock_youtube_api: MagicMock
     ):
@@ -418,11 +490,9 @@ class TestBroadcastDiscoveryOther:
             MONITOR_MODE_OTHER,
             MOCK_TARGET_CHANNEL_ID,
         )
-        mock_youtube_api.search.return_value.list.return_value.execute.return_value = (
-            make_search_response()
-        )
-        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = (
-            make_video_details_response(viewer_count=200)
+        self._setup_other_mocks(
+            mock_youtube_api,
+            make_video_details_response(viewer_count=200),
         )
 
         await coord._check_for_broadcast()
@@ -434,7 +504,7 @@ class TestBroadcastDiscoveryOther:
     async def test_no_live_video_on_other_channel(
         self, hass: HomeAssistant, mock_youtube_api: MagicMock
     ):
-        """No live video found on the other channel."""
+        """No videos in uploads playlist means not live."""
         coord = YouTubeChatCoordinator(
             hass,
             mock_youtube_api,
@@ -442,7 +512,10 @@ class TestBroadcastDiscoveryOther:
             MONITOR_MODE_OTHER,
             MOCK_TARGET_CHANNEL_ID,
         )
-        mock_youtube_api.search.return_value.list.return_value.execute.return_value = {
+        mock_youtube_api.channels.return_value.list.return_value.execute.return_value = (
+            make_channel_response()
+        )
+        mock_youtube_api.playlistItems.return_value.list.return_value.execute.return_value = {
             "items": []
         }
 
@@ -461,16 +534,85 @@ class TestBroadcastDiscoveryOther:
             MONITOR_MODE_OTHER,
             MOCK_TARGET_CHANNEL_ID,
         )
-        mock_youtube_api.search.return_value.list.return_value.execute.return_value = (
-            make_search_response()
+        self._setup_other_mocks(
+            mock_youtube_api,
+            {"items": [{"liveStreamingDetails": {}}]},
         )
-        mock_youtube_api.videos.return_value.list.return_value.execute.return_value = {
-            "items": [{"liveStreamingDetails": {}}]
-        }
 
         await coord._check_for_broadcast()
 
         assert coord._is_live is False
+
+    async def test_caches_uploads_playlist_id(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """Uploads playlist ID is fetched once and cached."""
+        coord = YouTubeChatCoordinator(
+            hass,
+            mock_youtube_api,
+            MOCK_ENTRY_ID,
+            MONITOR_MODE_OTHER,
+            MOCK_TARGET_CHANNEL_ID,
+        )
+        self._setup_other_mocks(
+            mock_youtube_api,
+            {"items": [{"liveStreamingDetails": {}}]},
+        )
+
+        await coord._check_for_broadcast()
+        await coord._check_for_broadcast()
+
+        # channels.list should only be called once
+        assert mock_youtube_api.channels.return_value.list.return_value.execute.call_count == 1
+        # playlistItems.list should be called each time
+        assert mock_youtube_api.playlistItems.return_value.list.return_value.execute.call_count == 2
+
+    async def test_scheduled_stream_uses_slow_interval(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """A stream scheduled far in the future uses slow polling."""
+        coord = YouTubeChatCoordinator(
+            hass,
+            mock_youtube_api,
+            MOCK_ENTRY_ID,
+            MONITOR_MODE_OTHER,
+            MOCK_TARGET_CHANNEL_ID,
+        )
+        from datetime import datetime, timezone
+        future = datetime.now(timezone.utc) + timedelta(hours=5)
+        self._setup_other_mocks(
+            mock_youtube_api,
+            {"items": [{"liveStreamingDetails": {"scheduledStartTime": future.isoformat()}}]},
+        )
+
+        await coord._check_for_broadcast()
+
+        assert coord._is_live is False
+        assert coord._scheduled_start is not None
+        assert coord.update_interval.total_seconds() > BROADCAST_CHECK_INTERVAL
+
+    async def test_imminent_stream_uses_fast_interval(
+        self, hass: HomeAssistant, mock_youtube_api: MagicMock
+    ):
+        """A stream starting within the active window polls frequently."""
+        coord = YouTubeChatCoordinator(
+            hass,
+            mock_youtube_api,
+            MOCK_ENTRY_ID,
+            MONITOR_MODE_OTHER,
+            MOCK_TARGET_CHANNEL_ID,
+        )
+        from datetime import datetime, timezone
+        soon = datetime.now(timezone.utc) + timedelta(minutes=5)
+        self._setup_other_mocks(
+            mock_youtube_api,
+            {"items": [{"liveStreamingDetails": {"scheduledStartTime": soon.isoformat()}}]},
+        )
+
+        await coord._check_for_broadcast()
+
+        assert coord._is_live is False
+        assert coord.update_interval == timedelta(seconds=BROADCAST_CHECK_INTERVAL)
 
 
 # ---------- Chat polling ----------
@@ -692,12 +834,13 @@ class TestErrorHandling:
         coord = YouTubeChatCoordinator(
             hass, mock_youtube_api, MOCK_ENTRY_ID, MONITOR_MODE_OWN
         )
-        mock_youtube_api.liveBroadcasts.return_value.list.return_value.execute.side_effect = (
-            RuntimeError("Connection lost")
-        )
 
-        with pytest.raises(UpdateFailed, match="Connection lost"):
-            await coord._async_update_data()
+        async def _raise(*args, **kwargs):
+            raise RuntimeError("Connection lost")
+
+        with patch.object(coord, "_check_for_broadcast", side_effect=RuntimeError("Connection lost")):
+            with pytest.raises(UpdateFailed, match="Connection lost"):
+                await coord._async_update_data()
 
 
 # ---------- build_data ----------

@@ -85,6 +85,9 @@ def mock_youtube_api() -> MagicMock:
     return _build_mock_youtube()
 
 
+MOCK_UPLOADS_PLAYLIST_ID = "UUother1234567890"
+
+
 def _build_mock_youtube() -> MagicMock:
     """Build a mock YouTube API client with chained method mocking."""
     youtube = MagicMock()
@@ -93,11 +96,6 @@ def _build_mock_youtube() -> MagicMock:
     broadcasts_list = MagicMock()
     youtube.liveBroadcasts.return_value.list.return_value = broadcasts_list
     broadcasts_list.execute.return_value = {"items": []}
-
-    # search().list().execute()
-    search_list = MagicMock()
-    youtube.search.return_value.list.return_value = search_list
-    search_list.execute.return_value = {"items": []}
 
     # videos().list().execute()
     videos_list = MagicMock()
@@ -118,6 +116,11 @@ def _build_mock_youtube() -> MagicMock:
     youtube.channels.return_value.list.return_value = channels_list
     channels_list.execute.return_value = {"items": []}
 
+    # playlistItems().list().execute()
+    playlist_items_list = MagicMock()
+    youtube.playlistItems.return_value.list.return_value = playlist_items_list
+    playlist_items_list.execute.return_value = {"items": []}
+
     return youtube
 
 
@@ -137,13 +140,32 @@ def make_broadcast_response(
     }
 
 
-def make_search_response(video_id: str = MOCK_VIDEO_ID) -> dict:
-    """Build a mock search.list response for a live video."""
+def make_channel_response(
+    uploads_playlist_id: str = MOCK_UPLOADS_PLAYLIST_ID,
+) -> dict:
+    """Build a mock channels.list response with contentDetails."""
     return {
         "items": [
             {
-                "id": {"videoId": video_id},
+                "contentDetails": {
+                    "relatedPlaylists": {
+                        "uploads": uploads_playlist_id,
+                    }
+                }
             }
+        ]
+    }
+
+
+def make_playlist_items_response(
+    video_ids: list[str] | None = None,
+) -> dict:
+    """Build a mock playlistItems.list response."""
+    if video_ids is None:
+        video_ids = [MOCK_VIDEO_ID]
+    return {
+        "items": [
+            {"contentDetails": {"videoId": vid}} for vid in video_ids
         ]
     }
 

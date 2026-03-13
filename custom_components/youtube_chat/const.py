@@ -10,15 +10,23 @@ CONF_TARGET_CHANNEL_ID = "target_channel_id"
 MONITOR_MODE_OWN = "own"
 MONITOR_MODE_OTHER = "other"
 DEFAULT_POLL_INTERVAL = 10  # seconds, overridden by API response
-BROADCAST_CHECK_INTERVAL = 60  # seconds when not live
+BROADCAST_CHECK_INTERVAL = 60  # seconds when approaching scheduled start
+SCHEDULE_CHECK_INTERVAL = 900  # 15 minutes, when no stream is imminent
+ACTIVE_WINDOW_MINUTES = 15  # start frequent polling this many minutes before scheduled start
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
 
 ROLE_EVERYONE = "Everyone"
+ROLE_MEMBERS_AND_ABOVE = "Members, moderators, and owner"
 ROLE_MODERATORS_AND_OWNER = "Moderators and owner"
 ROLE_OWNER_ONLY = "Owner only"
-ALLOWED_ROLES = [ROLE_EVERYONE, ROLE_MODERATORS_AND_OWNER, ROLE_OWNER_ONLY]
+ALLOWED_ROLES = [
+    ROLE_EVERYONE,
+    ROLE_MEMBERS_AND_ABOVE,
+    ROLE_MODERATORS_AND_OWNER,
+    ROLE_OWNER_ONLY,
+]
 
 
 def get_device_info(entry) -> dict:
